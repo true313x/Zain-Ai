@@ -1,8 +1,5 @@
 name: Build APK
 
-# Works two ways:
-#  1) repo contains the project ZIP at its root (upload the .zip as-is, no unzipping) -> it is unzipped here
-#  2) repo contains the unzipped project -> it is built directly
 on:
   push:
   workflow_dispatch:
@@ -43,7 +40,20 @@ jobs:
 
       - name: Build debug APK
         working-directory: ${{ env.PROJECT_DIR }}
-        run: gradle assembleDebug --stacktrace --no-daemon
+        run: |
+          set -o pipefail
+          gradle assembleDebug --continue --no-daemon 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+
+      - name: Show errors in summary
+        if: failure()
+        run: |
+          {
+            echo '### Build errors'
+            echo '```'
+            grep -E '^e: ' build.log | sed -E 's#file:///home/runner/work/[^/]+/[^/]+/_src/ZainIQ/##' | head -80
+            grep -A3 'What went wrong' build.log | head -60
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         with:
